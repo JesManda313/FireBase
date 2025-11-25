@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "636211182846",
+    "project_id": "fir-kelaspaba",
+    "storage_bucket": "fir-kelaspaba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:636211182846:android:1846b253ebaf7efb8779af",
+        "android_client_info": {
+          "package_name": "com.example.firebase"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhelLQgphZIrhuEDZFwEgywHSV3O2yUiQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
