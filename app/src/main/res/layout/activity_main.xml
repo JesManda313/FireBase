@@ -40,8 +40,17 @@
         android:layout_height="wrap_content"
         android:text="Tambah Data" />
 
+    <ProgressBar
+        android:id="@+id/progressBarUpload"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:indeterminate="false"
+        android:visibility="gone" />
+
     <ListView
         android:id="@+id/lvData"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
 </LinearLayout>

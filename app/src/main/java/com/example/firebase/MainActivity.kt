@@ -5,11 +5,13 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.util.Log.i
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.ListView
+import android.widget.ProgressBar
 import android.widget.SimpleAdapter
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,12 +19,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.gms.cast.tv.media.MediaManager
+import com.bumptech.glide.Glide
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
 import java.io.File
 import java.lang.System.currentTimeMillis
+import kotlin.collections.isNotEmpty
 
 
 class MainActivity : AppCompatActivity() {
@@ -37,9 +43,11 @@ class MainActivity : AppCompatActivity() {
     lateinit var _btnSimpan : Button
     lateinit var _lvData : ListView
     lateinit var _ivUpload : ImageView
+    lateinit var _progressBarUpload : ProgressBar
+
 
     private val CLOUDINARY_CLOUD_NAME = "dhl8dbept"
-    private val UNSIGNES_UPLOAD_PRESET = "preset1"
+    private val UNSIGNED_UPLOAD_PRESET= "preset1"
     private var selectedImageUri : Uri? = null
     private var cameraImageUri : Uri? = null
 
@@ -61,6 +69,8 @@ class MainActivity : AppCompatActivity() {
         _btnSimpan = findViewById<Button>(R.id.btnSimpan)
         _lvData = findViewById<ListView>(R.id.lvData)
         _ivUpload = findViewById<ImageView>(R.id.ivUpload)
+        _progressBarUpload = findViewById(R.id.progressBarUpload)
+
 
 
 
@@ -78,11 +88,17 @@ class MainActivity : AppCompatActivity() {
             intArrayOf(R.id.imgLogo, R.id.text1, R.id.text2)
         )
         lvAdapter.setViewBinder{ view, data,_ ->
-            if (view.id == R.id.imgLogo){
+            if (view.id == R.id.imgLogo) {
                 val imgView = view as ImageView
-                val defaultImage = com.google.android.gms.base.R.drawable.common_google_signin_btn_icon_dark
+                val defaultImage =
+                    com.google.android.gms.base.R.drawable.common_google_signin_btn_icon_dark
 
-                if (data is String && data.isNotEmpty()){
+                if (data is String && data.isNotEmpty()) {
+                    Glide.with(this@MainActivity)
+                        .load(data)
+                        .placeholder(defaultImage)
+                        .error(defaultImage)
+                        .into(imgView)
 
                 } else {
                     imgView.setImageResource(defaultImage)
@@ -114,13 +130,18 @@ class MainActivity : AppCompatActivity() {
         _lvData.adapter = lvAdapter
 
         _btnSimpan.setOnClickListener {
-            TambahData(db, _etProvinsi.text.toString(), _etIbukota.text.toString())
+            if (selectedImageUri != null){
+                uploadToCloudinary(db, selectedImageUri!!)
+            } else {
+                TambahData(db, _etProvinsi.text.toString(), _etIbukota.text.toString(), "")
+            }
+
         }
 
         readData(db)
 
         val config = mapOf("cloud_name" to
-            CLOUDINARY_CLOUD_NAME, "upload_preset" to UNSIGNES_UPLOAD_PRESET)
+            CLOUDINARY_CLOUD_NAME, "upload_preset" to UNSIGNED_UPLOAD_PRESET)
         MediaManager.init(this, config)
 
 
@@ -175,14 +196,69 @@ class MainActivity : AppCompatActivity() {
             }
             .show()
     }
-    fun TambahData(db : FirebaseFirestore, provinsi : String, ibukota: String ){
-        val dataBaru = daftarProvinsi(provinsi, ibukota)
+
+    private fun uploadToCloudinary(db: FirebaseFirestore, uri: Uri) {
+        MediaManager.get().upload(uri)
+            .unsigned(UNSIGNED_UPLOAD_PRESET)
+            .option("folder", "cobaFirebase")
+            .callback(object : UploadCallback {
+                override fun onStart(requestId: String?) {
+                    Log.d("Cloudinary", "Upload Start: $requestId")
+
+                    runOnUiThread {
+                        _progressBarUpload.visibility = View.VISIBLE
+                        _progressBarUpload.progress = 0
+                        _progressBarUpload.max = 100
+                    }
+                }
+
+                override fun onProgress(requestId: String?, bytes: Long, totalBytes: Long) {
+                    val progress =  (bytes * 100 / totalBytes).toInt()
+                    runOnUiThread {
+                        _progressBarUpload.progress = progress
+                    }
+                }
+
+                override fun onSuccess(requestId: String?, resultData: Map<*, *>?) {
+                    var url = resultData?.get("secure url")?.toString()
+                    Log.d("Cloudinary", "Upload Success: $url")
+
+                    TambahData(db, _etProvinsi.text.toString(),
+                        _etIbukota.text.toString(), url.toString())
+
+                    runOnUiThread {
+                        _progressBarUpload.visibility = View.GONE
+                    }
+
+                }
+
+                override fun onError(requestId: String?, error: ErrorInfo?) {
+                    Log.d("Cloudinary", "Upload Error: ${error.toString()}")
+                    runOnUiThread {
+                        _progressBarUpload.visibility = View.GONE
+                    }
+                }
+
+                override fun onReschedule(requestId: String?, error: ErrorInfo?) {
+                    Log.d("Cloudinary", "Upload reschedule: ${error.toString()}")
+                    runOnUiThread {
+                        _progressBarUpload.visibility = View.GONE
+                    }
+                }
+            }).dispatch()
+
+        Log.d("Cloudinary", "Upload with preset : $UNSIGNED_UPLOAD_PRESET")
+    }
+    fun TambahData(db : FirebaseFirestore, provinsi : String, ibukota: String, imageUrl : String){
+        val dataBaru = daftarProvinsi(provinsi, ibukota, imageUrl)
         db.collection("tbProvinsi")
             .document(_etProvinsi.text.toString())
             .set(dataBaru)
             .addOnSuccessListener {
                 _etProvinsi.setText("")
                 _etIbukota.setText("")
+                _ivUpload.setImageResource(com.google.android.gms.base.R.drawable.common_google_signin_btn_icon_dark)
+                selectedImageUri = null
                 readData(db)
                 Log.d("Firebase", dataBaru.provinsi + "Berhasil di tambahkan")
             }
@@ -207,9 +283,11 @@ class MainActivity : AppCompatActivity() {
 //                    )
 //                    dataProvinsi.add(itemdata)
 
-                    val itemdata : MutableMap<String, Any> = HashMap(2)
+                    val itemdata : MutableMap<String, Any> = HashMap(3)
                     itemdata["Pro"] = item.data.get("provinsi").toString()
                     itemdata["Ibu"] = item.data.get("ibukota").toString()
+                    itemdata["Img"] = item.data.get("imageUrl").toString()
+                    Log.d("Firebase", item.data.get("imageUrl").toString())
                     data.add(itemdata)
                 }
                 lvAdapter.notifyDataSetChanged()
