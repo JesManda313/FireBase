@@ -220,7 +220,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 override fun onSuccess(requestId: String?, resultData: Map<*, *>?) {
-                    var url = resultData?.get("secure url")?.toString()
+                    var url = resultData?.get("secure_url")?.toString()
                     Log.d("Cloudinary", "Upload Success: $url")
 
                     TambahData(db, _etProvinsi.text.toString(),
